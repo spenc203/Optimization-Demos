@@ -81,7 +81,7 @@ CONSTRAINT_MATRIX = np.array([
 st.divider()
 
 # --- Section 2: THE OPTIMIZATION RESULTS ---
-st.header("2. The Optimal Production Plan (Manager's Report) 📈")
+st.header("2. The Optimal Production Plan (Manager's Report)")
 
 # Solve the LP problem
 success, optimal_x, optimal_y, max_profit = solve_lp(OBJECTIVE_COEFFS, CONSTRAINT_MATRIX, CONSTRAINT_BOUNDS, VAR_NAMES)
@@ -111,9 +111,9 @@ if success:
         Objective Function (Maximize Profit P): P = {profit_car}x + {profit_truck}y
 
         Constraints (Limits on Resources):
-        1. Assembly: {assembly_car_usage}x + {assembly_truck_usage}y ≤ {assembly_limit}
-        2. Painting: {painting_car_usage}x + {painting_truck_usage}y ≤ {painting_limit}
-        3. Non-negativity: x ≥ 0, y ≥ 0
+        1. Assembly: {assembly_car_usage}x + {assembly_truck_usage}y <= {assembly_limit}
+        2. Painting: {painting_car_usage}x + {painting_truck_usage}y <= {painting_limit}
+        3. Non-negativity: x >= 0, y >= 0
         """,
         language="python"
     )
