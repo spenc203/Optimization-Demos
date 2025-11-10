@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Otto Toyom's Factory Optimizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f7f9fc; }
+        .card { background-color: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); }
+        input[type="number"] {
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 0.5rem;
+            width: 100%;
+            transition: border-color 0.15s ease-in-out;
+        }
+        input[type="number"]:focus {
+            border-color: #3b82f6;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+        }
+        .binding-resource {
+            color: #dc2626; /* Red 600 */
+            font-weight: 600;
+        }
+        .slack-resource {
+            color: #16a34a; /* Green 600 */
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-8">
+        <header class="text-center">
+            <h1 class="text-3xl font-extrabold text-gray-800 mb-2">Otto Toyom's Factory Optimizer</h1>
+            <p class="text-gray-600">Linear Programming Solver for Cars (C) and Trucks (T)</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Configuration Card -->
+            <div class="lg:col-span-1 card">
+                <h2 class="text-xl font-bold mb-4 text-indigo-600">1. Factory Setup & Profit</h2>
+                
+                <h3 class="font-semibold mt-4 mb-2">A. Current Inventory</h3>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Wheels (W)</label>
+                        <input type="number" id="W_max" value="360" min="0">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Seats (S)</label>
+                        <input type="number" id="S_max" value="180" min="0">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Gas Tanks (G)</label>
+                        <input type="number" id="G_max" value="120" min="0">
+                    </div>
+                </div>
+
+                <h3 class="font-semibold mt-6 mb-2">B. Selling Prices (Profit per unit)</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Car Price (P<sub class="text-xs">C</sub>)</label>
+                        <input type="number" id="P_car" value="1" min="0.01" step="0.5">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Truck Price (P<sub class="text-xs">T</sub>)</label>
+                        <input type="number" id="P_truck" value="2" min="0.01" step="0.5">
+                    </div>
+                </div>
+
+                <button id="calculate-max-profit" class="mt-6 w-full py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150">
+                    Find Maximum Profit
+                </button>
+
+                <h3 class="font-semibold mt-8 mb-2 border-t pt-4">C. Target Profit Quota</h3>
+                <label class="block text-sm font-medium text-gray-700">Target Profit ($)</label>
+                <div class="flex space-x-2">
+                    <input type="number" id="P_target" value="100" min="1" step="1" class="flex-grow">
+                    <button id="calculate-target-quota" class="py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150">
+                        Find Combinations
+                    </button>
+                </div>
+                
+            </div>
+
+            <!-- Visualization and Results Card -->
+            <div class="lg:col-span-2 card">
+                <h2 class="text-xl font-bold mb-4 text-indigo-600">2. Feasible Region & Optimal Solution (C-T Plane)</h2>
+                <div class="relative">
+                    <canvas id="lpCanvas" class="border border-gray-300 rounded-lg w-full" width="600" height="400"></canvas>
+                    <p class="absolute bottom-0 left-1/2 transform -translate-x-1/2 text-sm text-gray-500">Cars (C) &rarr;</p>
+                    <p class="absolute top-1/2 left-0 transform -translate-y-1/2 -rotate-90 text-sm text-gray-500">&larr; Trucks (T)</p>
+                </div>
+
+                <div class="mt-6 space-y-4">
+                    <!-- Constraint Inequalities and Objective Function -->
+                    <div id="constraint-list-container" class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <h3 class="text-lg font-semibold text-blue-700 mb-2">Linear Programming Model</h3>
+                        <div class="space-y-3">
+                            <div id="objective-function-details">
+                                <h4 class="font-bold text-gray-800 mb-1">Objective: Maximize Profit (Z)</h4>
+                                <p id="profit-function" class="font-mono text-lg text-red-600">Z = P<span class="text-sm">C</span> + P<span class="text-sm">T</span></p>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-bold text-gray-800 mb-1">Constraints:</h4>
+                                <ul id="constraint-details" class="space-y-1 text-gray-700 text-base">
+                                    <!-- Constraints will be injected here by JS -->
+                                </ul>
+                                <p class="font-mono mt-1 text-sm">C ≥ 0, T ≥ 0 (Non-Negativity)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="max-profit-results" class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-2">3. Maximum Profit Solution & Slack Analysis</h3>
+                        <div id="optimal-solution" class="text-base text-gray-800">Please enter values and click "Find Maximum Profit".</div>
+                        <div id="slack-analysis" class="text-sm text-gray-700 mt-3 border-t pt-3"></div>
+                        <div id="corner-points" class="text-sm text-gray-600 mt-2"></div>
+                    </div>
+                    
+                    <div id="target-quota-results" class="bg-yellow-50 p-4 rounded-lg hidden">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-2">Target Quota Results (<span id="quota-value"></span>)</h3>
+                        <div id="quota-combinations" class="text-sm text-gray-800 h-24 overflow-y-auto"></div>
+                        <div id="quota-summary" class="text-xs text-gray-600 mt-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Constants (Car: C, Truck: T)
+        // Constraints: 4C + 6T <= W_max, 2C + 1T <= S_max, 1C + 3T <= G_max
+        const CONSTRAINTS = {
+            W: { a: 4, b: 6, label: 'Wheels' },
+            S: { a: 2, b: 1, label: 'Seats' },
+            G: { a: 1, b: 3, label: 'Gas Tanks' },
+        };
+
+        const canvas = document.getElementById('lpCanvas');
+        const ctx = canvas.getContext('2d');
+        let C_scale, T_scale; // C (x-axis), T (y-axis)
+
+        // Helper function to solve 2x2 linear system: a1*C + b1*T = c1 and a2*C + b2*T = c2
+        function solveIntersection(a1, b1, c1, a2, b2, c2, name) {
+            const D = a1 * b2 - a2 * b1;
+            if (Math.abs(D) < 1e-6) return null; // Parallel or coincident lines
+
+            const C = (c1 * b2 - c2 * b1) / D;
+            const T = (a1 * c2 - a2 * c1) / D;
+
+            return { C, T, name };
+        }
+
+        // Check if a point (C, T) is feasible (satisfies all constraints)
+        function isFeasible(C, T, W_max, S_max, G_max) {
+            if (C < -1e-6 || T < -1e-6) return false; // Non-negativity
+
+            // Check W: 4C + 6T <= W_max
+            if (CONSTRAINTS.W.a * C + CONSTRAINTS.W.b * T > W_max + 1e-6) return false;
+            // Check S: 2C + 1T <= S_max
+            if (CONSTRAINTS.S.a * C + CONSTRAINTS.S.b * T > S_max + 1e-6) return false;
+            // Check G: 1C + 3T <= G_max
+            if (CONSTRAINTS.G.a * C + CONSTRAINTS.G.b * T > G_max + 1e-6) return false;
+
+            return true;
+        }
+
+        // Main logic to find the feasible region vertices and max profit
+        function findMaxProfit() {
+            const W_max = parseFloat(document.getElementById('W_max').value) || 0;
+            const S_max = parseFloat(document.getElementById('S_max').value) || 0;
+            const G_max = parseFloat(document.getElementById('G_max').value) || 0;
+            const P_car = parseFloat(document.getElementById('P_car').value) || 0;
+            const P_truck = parseFloat(document.getElementById('P_truck').value) || 0;
+
+            if (W_max <= 0 || S_max <= 0 || G_max <= 0 || P_car <= 0 || P_truck <= 0) {
+                document.getElementById('optimal-solution').textContent = "Please ensure all inputs (Inventory and Prices) are positive.";
+                document.getElementById('slack-analysis').textContent = "";
+                document.getElementById('corner-points').textContent = "";
+                // Clear constraint list on error
+                document.getElementById('constraint-details').innerHTML = '';
+                document.getElementById('profit-function').textContent = `Z = ${P_car.toFixed(2)}C + ${P_truck.toFixed(2)}T`;
+                drawGraph([], W_max, S_max, G_max, P_car, P_truck);
+                return;
+            }
+
+            const c = CONSTRAINTS;
+            const maxW = W_max, maxS = S_max, maxG = G_max;
+
+            // NEW STEP: Display Objective Function and Constraints
+            document.getElementById('profit-function').innerHTML = `
+                Z = ${P_car.toFixed(2)}C + ${P_truck.toFixed(2)}T
+            `;
+            const constraintsHTML = `
+                <li class="font-mono"><span class="font-bold text-red-600">Wheels (W):</span> ${c.W.a}C + ${c.W.b}T ≤ ${W_max}</li>
+                <li class="font-mono"><span class="font-bold text-blue-600">Seats (S):</span> ${c.S.a}C + ${c.S.b}T ≤ ${S_max}</li>
+                <li class="font-mono"><span class="font-bold text-green-600">Gas Tanks (G):</span> ${c.G.a}C + ${c.G.b}T ≤ ${G_max}</li>
+            `;
+            document.getElementById('constraint-details').innerHTML = constraintsHTML;
+
+
+            // 1. Collect all potential intersection points
+            let potentialPoints = [];
+
+            // Origin (0, 0)
+            potentialPoints.push({ C: 0, T: 0, name: 'Origin' });
+
+            // Intercepts (Intersection with C=0 or T=0)
+            // C-Axis (T=0) Intercepts:
+            potentialPoints.push({ C: maxW / c.W.a, T: 0, name: 'W-Axis T=0' });
+            potentialPoints.push({ C: maxS / c.S.a, T: 0, name: 'S-Axis T=0' });
+            potentialPoints.push({ C: maxG / c.G.a, T: 0, name: 'G-Axis T=0' });
+            // T-Axis (C=0) Intercepts:
+            potentialPoints.push({ C: 0, T: maxW / c.W.b, name: 'W-Axis C=0' });
+            potentialPoints.push({ C: 0, T: maxS / c.S.b, name: 'S-Axis C=0' });
+            potentialPoints.push({ C: 0, T: maxG / c.G.b, name: 'G-Axis C=0' });
+
+
+            // Pairwise Intersections (L_W, L_S), (L_W, L_G), (L_S, L_G)
+            potentialPoints.push(solveIntersection(c.W.a, c.W.b, maxW, c.S.a, c.S.b, maxS, 'W/S'));
+            potentialPoints.push(solveIntersection(c.W.a, c.W.b, maxW, c.G.a, c.G.b, maxG, 'W/G'));
+            potentialPoints.push(solveIntersection(c.S.a, c.S.b, maxS, c.G.a, c.G.b, maxG, 'S/G'));
+
+            // 2. Filter for unique, non-negative, and feasible corner points
+            let uniquePoints = [];
+            potentialPoints.filter(p => p !== null).forEach(p => {
+                // Round to handle floating point errors for feasibility check
+                p.C = Math.round(p.C * 1000) / 1000;
+                p.T = Math.round(p.T * 1000) / 1000;
+
+                if (isFeasible(p.C, p.T, W_max, S_max, G_max)) {
+                    // Check for near-duplicates
+                    if (!uniquePoints.some(up => Math.abs(up.C - p.C) < 1e-3 && Math.abs(up.T - p.T) < 1e-3)) {
+                        uniquePoints.push(p);
+                    }
+                }
+            });
+
+            // 3. Calculate Profit and find Maximum
+            let maxProfit = -1;
+            let optimalPoint = null;
+            let cornerPointInfo = [];
+
+            uniquePoints.forEach(p => {
+                p.Profit = (P_car * p.C + P_truck * p.T);
+                p.Profit = Math.round(p.Profit * 100) / 100; // Round profit to 2 decimals
+                cornerPointInfo.push(`(${p.C}, ${p.T}) - Profit: $${p.Profit.toFixed(2)}`);
+
+                // Check for a new maximum (use integer values for production in the final display)
+                const C_int = Math.floor(p.C);
+                const T_int = Math.floor(p.T);
+                const intProfit = P_car * C_int + P_truck * T_int;
+
+                if (intProfit > maxProfit) {
+                    maxProfit = intProfit;
+                    optimalPoint = { C: C_int, T: T_int };
+                } else if (intProfit === maxProfit && optimalPoint) {
+                    // Handle multiple optimal points with the same profit (e.g., along an edge)
+                    // If profits are equal, we prioritize the one closer to the highest C or T production for robustness.
+                    if (C_int > optimalPoint.C || T_int > optimalPoint.T) {
+                        optimalPoint = { C: C_int, T: T_int };
+                    }
+                }
+            });
+            
+            // 4. Calculate Resource Slack at the Optimal Integer Point
+            let slackHTML = '';
+            if (optimalPoint) {
+                const C = optimalPoint.C;
+                const T = optimalPoint.T;
+
+                const c = CONSTRAINTS;
+                const usedW = c.W.a * C + c.W.b * T;
+                const usedS = c.S.a * C + c.S.b * T;
+                const usedG = c.G.a * C + c.G.b * T;
+
+                const slackW = W_max - usedW;
+                const slackS = S_max - usedS;
+                const slackG = G_max - usedG;
+                
+                slackHTML = `
+                    <h4 class="font-bold text-gray-800 mb-1">Resource Utilization at Optimal Production:</h4>
+                    <div class="space-y-1">
+                        <div class="flex justify-between">
+                            <span class="font-medium">Wheels (W):</span>
+                            <span class="${slackW < 1e-6 ? 'binding-resource' : 'slack-resource'}">${usedW} / ${W_max} ${slackW < 1e-6 ? '(Binding: Used all)' : `(Slack: ${slackW.toFixed(0)} left)`}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="font-medium">Seats (S):</span>
+                            <span class="${slackS < 1e-6 ? 'binding-resource' : 'slack-resource'}">${usedS} / ${S_max} ${slackS < 1e-6 ? '(Binding: Used all)' : `(Slack: ${slackS.toFixed(0)} left)`}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="font-medium">Gas Tanks (G):</span>
+                            <span class="${slackG < 1e-6 ? 'binding-resource' : 'slack-resource'}">${usedG} / ${G_max} ${slackG < 1e-6 ? '(Binding: Used all)' : `(Slack: ${slackG.toFixed(0)} left)`}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 5. Draw Graph
+            drawGraph(uniquePoints, W_max, S_max, G_max, P_car, P_truck, optimalPoint);
+
+            // 6. Display Results
+            document.getElementById('target-quota-results').classList.add('hidden');
+            document.getElementById('slack-analysis').innerHTML = slackHTML;
+
+            if (optimalPoint) {
+                document.getElementById('optimal-solution').innerHTML = `
+                    <p class="font-bold text-lg text-green-700">Max Profit: $${maxProfit.toFixed(2)}</p>
+                    <p>Produce <span class="font-mono bg-green-100 px-1 rounded">${optimalPoint.C}</span> Cars and <span class="font-mono bg-green-100 px-1 rounded">${optimalPoint.T}</span> Trucks.</p>
+                `;
+            } else {
+                document.getElementById('optimal-solution').textContent = "No feasible integer solution found. Check your constraints.";
+            }
+
+            document.getElementById('corner-points').innerHTML = `
+                <p class="font-medium text-gray-700 mt-2">Feasible Corner Points (Fractional):</p>
+                <ul class="list-disc ml-5">${cornerPointInfo.map(item => `<li>${item}</li>`).join('')}</ul>
+            `;
+        }
+        
+        // Target Quota Logic (No changes needed)
+        function findTargetQuotaCombinations() {
+            const W_max = parseFloat(document.getElementById('W_max').value) || 0;
+            const S_max = parseFloat(document.getElementById('S_max').value) || 0;
+            const G_max = parseFloat(document.getElementById('G_max').value) || 0;
+            const P_car = parseFloat(document.getElementById('P_car').value) || 0;
+            const P_truck = parseFloat(document.getElementById('P_truck').value) || 0;
+            const P_target = parseFloat(document.getElementById('P_target').value) || 0;
+
+            if (P_target <= 0) {
+                 document.getElementById('quota-combinations').textContent = "Please enter a positive Target Profit.";
+                 document.getElementById('quota-summary').textContent = "";
+                 document.getElementById('target-quota-results').classList.remove('hidden');
+                 return;
+            }
+
+            document.getElementById('quota-value').textContent = `$${P_target.toFixed(2)}`;
+
+            // Determine max search boundaries from max intercepts (C_max/T_max)
+            const C_limit = Math.floor(Math.min(W_max / CONSTRAINTS.W.a, S_max / CONSTRAINTS.S.a, G_max / CONSTRAINTS.G.a)) + 1;
+            const T_limit = Math.floor(Math.min(W_max / CONSTRAINTS.W.b, S_max / CONSTRAINTS.S.b, G_max / CONSTRAINTS.G.b)) + 1;
+
+            let validCombinations = [];
+
+            for (let C = 0; C < C_limit; C++) {
+                for (let T = 0; T < T_limit; T++) {
+                    const profit = P_car * C + P_truck * T;
+                    
+                    if (isFeasible(C, T, W_max, S_max, G_max) && profit >= P_target - 1e-6) {
+                        validCombinations.push({ C, T, profit: Math.round(profit * 100) / 100 });
+                    }
+                }
+            }
+            
+            document.getElementById('target-quota-results').classList.remove('hidden');
+            if (validCombinations.length > 0) {
+                const combinationsHTML = validCombinations.map(c => 
+                    `<span class="inline-block bg-white text-blue-800 border border-blue-200 rounded-full px-2 py-0.5 m-0.5 text-xs">
+                        C: ${c.C}, T: ${c.T} ($${c.profit.toFixed(2)})
+                    </span>`
+                ).join('');
+                document.getElementById('quota-combinations').innerHTML = combinationsHTML;
+                document.getElementById('quota-summary').textContent = `Found ${validCombinations.length} distinct ways to meet or exceed the $${P_target.toFixed(2)} profit quota.`;
+            } else {
+                document.getElementById('quota-combinations').textContent = "No integer combination of Cars and Trucks within the current inventory can meet or exceed this profit quota. Try reducing the target profit.";
+                document.getElementById('quota-summary').textContent = ``;
+            }
+        }
+
+        // --- Canvas Drawing Logic (No changes needed) ---
+        function drawGraph(points, W_max, S_max, G_max, P_car, P_truck, optimalPoint = null) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Determine C and T max values for scaling
+            const C_max_coord = Math.max(10, ...points.map(p => p.C), 
+                                        W_max/CONSTRAINTS.W.a, S_max/CONSTRAINTS.S.a, G_max/CONSTRAINTS.G.a) + 10;
+            const T_max_coord = Math.max(10, ...points.map(p => p.T), 
+                                        W_max/CONSTRAINTS.W.b, S_max/CONSTRAINTS.S.b, G_max/CONSTRAINTS.G.b) + 10;
+
+            // Padding and scale setup
+            const padding = 30;
+            const drawAreaW = canvas.width - 2 * padding;
+            const drawAreaH = canvas.height - 2 * padding;
+            
+            C_scale = drawAreaW / C_max_coord;
+            T_scale = drawAreaH / T_max_coord;
+
+            // Helper to transform (C, T) to canvas (x, y)
+            const toX = C => padding + C * C_scale;
+            const toY = T => canvas.height - padding - T * T_scale;
+            const fromX = x => (x - padding) / C_scale;
+            const fromY = y => (canvas.height - padding - y) / T_scale;
+
+            // Draw Axes
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, canvas.height - padding);
+            ctx.lineTo(padding, padding); // Y-axis (Trucks T)
+            ctx.moveTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding); // X-axis (Cars C)
+            ctx.stroke();
+
+            // Axis Labels and Ticks
+            ctx.fillStyle = '#333';
+            ctx.font = '10px Inter';
+            for (let C = 0; C <= C_max_coord; C += Math.ceil(C_max_coord / 10)) {
+                ctx.fillText(C, toX(C) - 5, canvas.height - padding + 15);
+            }
+            for (let T = 0; T <= T_max_coord; T += Math.ceil(T_max_coord / 10)) {
+                ctx.fillText(T, padding - 25, toY(T) + 3);
+            }
+            
+            // Draw Constraint Lines (Boundaries)
+            const drawLine = (a, b, c, color, label) => {
+                if (Math.abs(c) < 1e-6) return; // Skip if max is zero
+                
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                
+                // C-intercept (T=0)
+                const C_int = c / a;
+                // T-intercept (C=0)
+                const T_int = c / b;
+
+                // Start point: T-axis intercept, clamped by T_max_coord
+                const startT = Math.min(T_int, T_max_coord);
+                ctx.moveTo(toX(0), toY(startT));
+
+                // End point: X-axis intercept, clamped by C_max_coord
+                const endC = Math.min(C_int, C_max_coord);
+                ctx.lineTo(toX(endC), toY(0));
+                
+                // Label the line near the axis if possible
+                if (C_int > 0) ctx.fillText(label, toX(C_int) - 10, canvas.height - padding - 5);
+                
+                ctx.stroke();
+            };
+
+            drawLine(CONSTRAINTS.W.a, CONSTRAINTS.W.b, W_max, 'rgba(239, 68, 68, 0.7)', 'W'); // Red - Wheels
+            drawLine(CONSTRAINTS.S.a, CONSTRAINTS.S.b, S_max, 'rgba(59, 130, 246, 0.7)', 'S'); // Blue - Seats
+            drawLine(CONSTRAINTS.G.a, CONSTRAINTS.G.b, G_max, 'rgba(16, 185, 129, 0.7)', 'G'); // Green - Gas Tanks
+            
+            // Draw Corner Points and find max profit for display
+            ctx.lineWidth = 1;
+            points.forEach(p => {
+                const x = toX(p.C);
+                const y = toY(p.T);
+                
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // Check for Optimal Point
+                if (optimalPoint && Math.abs(p.C - optimalPoint.C) < 1e-3 && Math.abs(p.T - optimalPoint.T) < 1e-3) {
+                    // This is the optimal point (or a point leading to it)
+                    ctx.fillStyle = '#f97316'; // Orange highlight
+                    ctx.beginPath();
+                    ctx.arc(x, y, 6, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            });
+
+            // Draw Profit Function Line (Isoprofit Line)
+            if (optimalPoint) {
+                // We use the derived profit from the optimal *integer* point
+                const maxZ = P_car * optimalPoint.C + P_truck * optimalPoint.T;
+
+                // Profit line: P_car * C + P_truck * T = maxZ
+                const C_profit_int = maxZ / P_car;
+                const T_profit_int = maxZ / P_truck;
+
+                ctx.strokeStyle = '#f97316';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                
+                // Draw line between the two axis intercepts, clamped to the graph area
+
+                ctx.moveTo(toX(0), toY(T_profit_int));
+                ctx.lineTo(toX(C_profit_int), toY(0));
+                
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                ctx.fillStyle = '#f97316';
+                ctx.font = '12px Inter bold';
+                // Find a good place to put the label near the profit line
+                const labelX = toX(C_profit_int * 0.5);
+                const labelY = toY(T_profit_int * 0.5);
+                
+                ctx.fillText(`Max Profit Z = $${maxZ.toFixed(2)}`, labelX, labelY - 5);
+            }
+        }
+
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputs = document.querySelectorAll('input[type="number"]');
+            inputs.forEach(input => input.addEventListener('input', findMaxProfit));
+            document.getElementById('calculate-max-profit').addEventListener('click', findMaxProfit);
+            document.getElementById('calculate-target-quota').addEventListener('click', findTargetQuotaCombinations);
+            
+            // Initial run
+            findMaxProfit();
+        });
+    </script>
+</body>
+</html>
